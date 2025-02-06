@@ -46,3 +46,5 @@ dataset = CIFAR10(args['data'])
 
 # if args['weights']:
 #     load_checkpoint(args['weights'], args['resume'])
+
+# TODO: Maybe instead of tensorboard, try another tool like weights and biases
