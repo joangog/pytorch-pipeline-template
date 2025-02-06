@@ -1,2 +1,2 @@
-# pytorch-pipeline
-A pipeline for training and testing pytorch models
+# pytorch-pipeline-template
+A pipeline template for training and testing pytorch models
