@@ -44,7 +44,7 @@ def read_config(config_file):
 
 def update_missing_args(args):
     """
-    Use default argument values from configurations for missing optional arguments.
+    Use default argument values from configuration file for missing arguments.
     :param args: Argument dictionary
     :return: Updated argument dictionary
     """

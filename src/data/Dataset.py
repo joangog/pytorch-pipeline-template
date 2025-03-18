@@ -4,21 +4,21 @@ from PIL import Image
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, image_dir, label_file, transform=None):
+    def __init__(self, image_dir, label_file, transform=None, label_to_int_map=None):
         self.image_dir = image_dir
         self.label_file = label_file
         self.transform = transform
 
-        self.label_to_int_map = None  # Mapping from label name to label integer index
+        self.label_to_int_map = label_to_int_map  # Mapping from label name to label integer index
 
         self.images, self.image_ext = self._load_images(image_dir)  # List of image names and the image file extension
         self.labels = self._load_labels(label_file)  # List of labels
 
-    def _label_to_int(self, label, map=None):
-        if map is None:
+    def _label_to_int(self, label):
+        if self.label_to_int_map is None:
             return label
         else:
-            return map[label]
+            return self.label_to_int_map[label]
 
     def _load_images(self, image_dir):
         images = []  # List of image names
@@ -36,7 +36,7 @@ class Dataset(torch.utils.data.Dataset):
                 image_name, label = line.strip().split(',')
                 image_name = os.path.splitext(image_name.replace(
                     self.image_dir, ''))[0]  # Clear path and file extension, keep only file name
-                labels[image_name] = self._label_to_int(label, self.label_to_int_map)  # Convert labels to integers
+                labels[image_name] = self._label_to_int(label)  # Convert labels to integers
         return labels
 
     def __len__(self):

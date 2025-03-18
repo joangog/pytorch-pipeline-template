@@ -1,10 +1,13 @@
 import os
-from data.Dataset import Dataset
+from src.data.Dataset import Dataset
 
 
 class CIFAR10(Dataset):
     def __init__(self, data_dir, transform=None):
-        self.label_to_int_map = {
+        image_dir = os.path.join(data_dir, 'train')
+        label_file = os.path.join(data_dir, 'trainLabels.csv')
+
+        label_to_int_map = {
             'airplane': 0,
             'automobile': 1,
             'bird': 2,
@@ -16,6 +19,5 @@ class CIFAR10(Dataset):
             'ship': 8,
             'truck': 9
         }
-        image_dir = os.path.join(data_dir, 'train')
-        label_file = os.path.join(data_dir, 'trainLabels.csv')
-        super().__init__(image_dir, label_file, transform)
+
+        super().__init__(image_dir, label_file, transform=None, label_to_int_map=label_to_int_map)

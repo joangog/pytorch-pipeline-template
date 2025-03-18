@@ -1,5 +1,7 @@
 import numpy as np
+import torch
 from torch.utils.data.dataset import Subset
+from torchvision import transforms
 
 
 def split_dataset(dataset, val_ratio, test_ratio, random=True):
@@ -31,4 +33,21 @@ def split_dataset(dataset, val_ratio, test_ratio, random=True):
 
 
 def collate_fn(batch):
-    pass
+    """
+    Function for collating a list of (image, label) pairs into a batch consisting of two tensors: images, labels.
+    :param batch: The list of (image, label) pairs
+    :return: The two tensors: images and labels.
+    """
+    # Unzip
+    images, labels = zip(*batch)
+    images = list(images)
+    labels = list(labels)
+
+    # Transform each image to tensor
+    transform = transforms.ToTensor()
+    images = [transform(image) for image in images]
+
+    # Stack tensors/elements into a batch tensor
+    images = torch.stack(images, dim=0)
+    labels = torch.tensor(labels)
+    return images, labels
