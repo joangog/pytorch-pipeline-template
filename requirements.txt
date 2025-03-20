@@ -1,4 +1,4 @@
-torch==2.6
+torch
 torchvision
 tqdm
 neptune

@@ -1,0 +1,11 @@
+{
+  "dataset": "CIFAR10",
+  "data": null,
+  "outputs": null,
+  "model": "CIFARModel",
+  "weights": null,
+  "batch": 16,
+  "device": "cpu",
+  "gpus": null,
+  "seed": 42
+}
