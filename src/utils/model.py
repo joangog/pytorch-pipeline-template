@@ -19,7 +19,8 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resu
     if resume:  # If resuming training from last epoch, then load optimizer and scheduler states
         start_epoch = checkpoint['epoch'] + 1
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        if scheduler:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     return model, optimizer, scheduler, start_epoch
 
 
@@ -49,11 +50,13 @@ def save_checkpoint(save_path, run_name, model, optimizer, scheduler, epoch, tra
     checkpoint = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'scheduler_state_dict': scheduler.state_dict(),
         'epoch': epoch,
         'train_loss': train_loss,
         'val_loss': val_loss,
     }
+    if scheduler:
+        checkpoint['scheduler_state_dict'] = scheduler.state_dict()
+
     run_save_path = os.path.join(save_path, run_name)
     os.makedirs(run_save_path, exist_ok=True)
     torch.save(checkpoint, os.path.join(run_save_path, f'epoch_{epoch}.pth'))

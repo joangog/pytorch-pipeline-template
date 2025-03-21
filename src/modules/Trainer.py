@@ -40,7 +40,9 @@ class Trainer(object):
         """
         Trains the model on one batch.
         :param model:  The model instance.
+        :param optimizer: The optimizer instance.
         :param batch: A batch of images and labels.
+        :param scheduler: The scheduler instance.
         :param tqdm_desc: A description string for the tqdm progress bar.
         :return: The loss.
         """
@@ -64,7 +66,7 @@ class Trainer(object):
                 self.tqdm_progress_bar.desc = tqdm_desc
             self.tqdm_progress_bar.update(1)
 
-        return loss.item(), model, optimizer, scheduler
+        return loss.item()
 
     def train_epoch(self, model, optimizer, train_loader, epoch, scheduler=None):
         """
@@ -80,15 +82,14 @@ class Trainer(object):
         loss = 0.0
 
         for batch_idx, batch in enumerate(train_loader):
-            tqdm_desc = f"Epoch {epoch + 1}/{self.total_epochs}, Training, Batch {batch_idx + 1}/{len(train_loader)}"
-            batch_loss, model, optimizer, scheduler = self.train_step(model, optimizer, batch, scheduler, tqdm_desc)
-            loss += batch_loss
+            tqdm_desc = f"Epoch {epoch} ({epoch + 1}/{self.total_epochs}), Training, Batch {batch_idx} ({batch_idx + 1}/{len(train_loader)})"
+            loss += self.train_step(model, optimizer, batch, scheduler, tqdm_desc)
 
         # Average loss
         loss = loss / len(train_loader)
 
         # TODO: Double check that not returning the model, optimizer and scheduler is ok
-        return loss, model, optimizer, scheduler
+        return loss
 
     def train(self, model, optimizer, train_loader, val_loader, scheduler=None):
         """
@@ -103,7 +104,7 @@ class Trainer(object):
 
         for epoch in range(self.total_epochs):
             # Train
-            train_loss, model, optimizer, scheduler = self.train_epoch(model, optimizer, train_loader, epoch, scheduler)
+            train_loss = self.train_epoch(model, optimizer, train_loader, epoch, scheduler)
 
             # Validate
             val_metrics = self.validator.evaluate(model, val_loader, epoch)

@@ -13,7 +13,7 @@ from src.utils.logging import suppress_logger_info, init_neptune_logger, init_te
 from src.utils.path import PATH, make_project_dirs
 from src.utils.arg import validate_args, update_missing_args
 from src.utils.data import split_dataset, collate_fn
-from src.utils.model import load_checkpoint, save_checkpoint
+from src.utils.model import load_checkpoint
 from src.utils.optimizer import select_optimizer
 from src.utils.scheduler import select_scheduler
 from src.utils.helper import gen_run_name, set_seed
@@ -39,7 +39,7 @@ parser.add_argument('--optimizer', '-opt', type=str, nargs='?', choices=['SGD'],
 parser.add_argument('--momentum', type=float, nargs='?', help='Momentum')
 parser.add_argument('--weight_decay', type=float, nargs='?', help='Weight decay')
 # TODO: Make scheduler optional
-parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, 'StepLR'],
+parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, 'None', 'StepLR'],
                     help='Learning rate scheduler')
 parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')
 parser.add_argument('--device', type=str, nargs='?', default="cpu", choices=['cpu', 'cuda'],

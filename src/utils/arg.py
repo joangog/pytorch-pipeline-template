@@ -12,12 +12,24 @@ def validate_args(args, parser):
     :return: The args with some overridden values if needed.
     """
 
+    # Args that can be None
+    none_args = ['weights', 'gpus', 'data', 'outputs', 'scheduler']
+
+    # Override values from the config file under conditions
+    if not args['data']:
+        args['data'] = os.path.join(PATH['DATA'], args['dataset'])
+    if not args['outputs']:
+        args['outputs'] = PATH['OUTPUTS']
+    for arg in none_args:
+        if args[arg] == 'None' or args[arg] == 'null':
+            args[arg] = None
+
     # Check expected types for arguments/actions according to parser
     for action in parser._actions:
         if action.dest == 'help':  # If helper_action, do not check
             continue
         if action.type:  # If store_action, check if type is expected by parser
-            if action.dest in ['weights', 'gpus', 'data', 'outputs']:  # These arguments can be None
+            if action.dest in none_args:  # These arguments can be None
                 expected_types = [action.type, type(None)]
             else:
                 expected_types = [action.type]
@@ -40,12 +52,6 @@ def validate_args(args, parser):
         raise ValueError('The argument "--momentum" must be < 1.')
     if args['weight_decay'] >= 1:
         raise ValueError('The argument "--weight_decay" must be < 1.')
-
-    # Override values from the config file under conditions
-    if not args['data']:
-        args['data'] = os.path.join(PATH['DATA'], args['dataset'])
-    if not args['outputs']:
-        args['outputs'] = PATH['OUTPUTS']
 
     return args
 
