@@ -1,5 +1,8 @@
 torch
+torchmetrics
 torchvision
 tqdm
 neptune
 tensorboard
+pillow
+numpy

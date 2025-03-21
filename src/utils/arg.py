@@ -52,7 +52,7 @@ def validate_args(args, parser):
 
 def read_config(config_file):
     """
-    Read configurations from file.
+    Reads configurations from file.
     :param config_file: Path to config file.
     :return: Configuration dictionary.
     """
@@ -63,7 +63,7 @@ def read_config(config_file):
 
 def update_missing_args(args):
     """
-    Use default argument values from configuration file for missing arguments.
+    Uses default argument values from configuration file for missing arguments.
     :param args: Argument dictionary.
     :return: Updated argument dictionary.
     """

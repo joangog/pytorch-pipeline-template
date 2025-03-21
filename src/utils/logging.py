@@ -7,9 +7,9 @@ from torch.utils.tensorboard import SummaryWriter
 from src.utils.path import PATH
 
 
-def supress_logger_info():
+def suppress_logger_info():
     """
-    Supress logger (tenrsorboard/neptune) info messages from showing up in the terminal
+    Suppresses logger (tenrsorboard/neptune) info messages from showing up in the terminal
     """
     logging.getLogger("neptune").setLevel(logging.ERROR)
     logging.getLogger("tensorboard").setLevel(logging.ERROR)
@@ -33,7 +33,8 @@ def init_neptune_logger(run_name, start_epoch, args):
 
 
 def init_tensorboard_logger(run_name, args):
-    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], 'train', args['dataset'], args['model'], run_name)
+    # Potential Bug: If resuming from a previous run, sometimes the graph has double values at the interrupted epoch
+    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], args['dataset'], args['model'], run_name)
     os.makedirs(log_path, exist_ok=True)
     tensorboard_log = SummaryWriter(os.path.join(log_path))
     return tensorboard_log

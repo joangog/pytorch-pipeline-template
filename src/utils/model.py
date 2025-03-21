@@ -34,18 +34,17 @@ def load_weights(checkpoint_path, model):
     return model
 
 
-def save_checkpoint(outputs_path, run_name, model, optimizer, scheduler, epoch, train_loss, val_loss, args):
+def save_checkpoint(save_path, run_name, model, optimizer, scheduler, epoch, train_loss, val_loss):
     """
     Saves training checkpoint in a corresponding folder inside the outputs path.
-    :param outputs_path: The path to the folder that contains all script outputs.
-    :param run_name: The run name.
+    :param save_path: The path to the directory with all saved checkpoints.
+    :param run_name: The run name, it is used for the directory with the checkpoints at each epoch for the current run.
     :param model: The model instance.
     :param optimizer: The optimizer instance.
     :param scheduler: The scheduler instance.
     :param epoch: The current epoch number.
     :param train_loss: The current train loss.
     :param val_loss: The current val loss.
-    :param args: The arguments passed to the script.
     """
     checkpoint = {
         'model_state_dict': model.state_dict(),
@@ -55,6 +54,6 @@ def save_checkpoint(outputs_path, run_name, model, optimizer, scheduler, epoch, 
         'train_loss': train_loss,
         'val_loss': val_loss,
     }
-    save_path = os.path.join(outputs_path, 'checkpoints', args['model'], args['dataset'], run_name)
-    os.makedirs(save_path, exist_ok=True)
-    torch.save(checkpoint, os.path.join(save_path, f'epoch_{epoch}.pth'))
+    run_save_path = os.path.join(save_path, run_name)
+    os.makedirs(run_save_path, exist_ok=True)
+    torch.save(checkpoint, os.path.join(run_save_path, f'epoch_{epoch}.pth'))

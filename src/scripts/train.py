@@ -1,20 +1,22 @@
 import argparse
 import os
 from tqdm import tqdm
-import torch
 from torch.utils.data import DataLoader
 from torch import nn
+from torchmetrics.classification import AUROC
 
 from src.data.CIFAR10 import CIFAR10  # Seems unused but it actually isn't
 from src.models.CIFARModel import CIFARModel  # Seems unused but it actually isn't
-from src.utils.logging import supress_logger_info, init_neptune_logger, init_tensorboard_logger
+from src.modules.Evaluator import Validator
+from src.modules.Trainer import Trainer
+from src.utils.logging import suppress_logger_info, init_neptune_logger, init_tensorboard_logger
 from src.utils.path import PATH, make_project_dirs
 from src.utils.arg import validate_args, update_missing_args
 from src.utils.data import split_dataset, collate_fn
 from src.utils.model import load_checkpoint, save_checkpoint
 from src.utils.optimizer import select_optimizer
 from src.utils.scheduler import select_scheduler
-from src.utils.helper import gen_run_name
+from src.utils.helper import gen_run_name, set_seed
 
 # PARSE ARGUMENTS ------------------------------------------------------------------------------------------------------
 
@@ -36,7 +38,8 @@ parser.add_argument('--learning-rate', '-lr', type=float, nargs='?', help='Learn
 parser.add_argument('--optimizer', '-opt', type=str, nargs='?', choices=['SGD'], help='Optimizer')
 parser.add_argument('--momentum', type=float, nargs='?', help='Momentum')
 parser.add_argument('--weight_decay', type=float, nargs='?', help='Weight decay')
-parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=['StepLR'],
+# TODO: Make scheduler optional
+parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, 'StepLR'],
                     help='Learning rate scheduler')
 parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')
 parser.add_argument('--device', type=str, nargs='?', default="cpu", choices=['cpu', 'cuda'],
@@ -57,10 +60,12 @@ args = validate_args(args, parser)  # Validate args from config file
 
 # INITIALIZATION -------------------------------------------------------------------------------------------------------
 
-run_name = gen_run_name(args)  # Generate run name using args
-print('Run name: ', run_name)
-
+# Initialize setup
+set_seed(args['seed'])  # Set seed
 make_project_dirs()  # Make all essential directories
+run_name = gen_run_name(args)  # Generate run name using args
+
+print('Run name: ', run_name)
 
 # Load dataset, split into subsets and generate loaders
 dataset = globals()[args['dataset']](args['data'])
@@ -75,13 +80,14 @@ optimizer = select_optimizer(args['optimizer'], model.parameters(), args)
 scheduler = select_scheduler(args['scheduler'], optimizer, args)
 start_epoch = 0
 if args['weights']:  # Load state from checkpoint
+    print('Loading checkpoint from ', args['weights'])
     model, optimizer, scheduler, start_epoch = load_checkpoint(args['weights'], model, optimizer, scheduler,
                                                                args['resume'])
 
 # Initialize logging
 neptune_log = None
 tensorboard_log = None
-supress_logger_info()  # Supress logger info messages
+suppress_logger_info()  # Supress logger info messages
 if args['neptune']:
     neptune_log = init_neptune_logger(run_name, start_epoch, args)
 if args['tensorboard']:
@@ -90,54 +96,25 @@ if args['tensorboard']:
 # Define loss function
 criterion = nn.CrossEntropyLoss()
 
+# Define evaluation metrics
+metrics = {'auc': AUROC(task="multiclass", num_classes=dataset.num_classes)}
+
 # TRAINING/VALIDATION LOOP -------------------------------------------------------------------------------------------
 
+print('Training...')
+
 progress_bar = tqdm(total=args['epochs'] * (len(train_loader) + len(val_loader)), initial=start_epoch)
-for epoch in range(start_epoch, args['epochs']):
 
-    # Train
-    model.train()
-    train_loss = 0.0
-    for batch_idx, (image, label) in enumerate(train_loader):
-        optimizer.zero_grad()
-        output = model(image)
-        loss = criterion(output, label)
-        loss.backward()
-        optimizer.step()
-        train_loss += loss.item()
-        progress_bar.desc = f"Epoch {epoch} ({epoch + 1}/{args['epochs']}), Training, Batch {batch_idx} ({batch_idx + 1}/{len(train_loader)})"
-        progress_bar.update(1)
-    avg_train_loss = train_loss / len(train_loader)
+# Initialize training modules
+validator = Validator(metrics, progress_bar, args['epochs'])
+trainer = Trainer(criterion, validator, args['epochs'], run_name,
+                  os.path.join(args['outputs'], 'checkpoints', args['model'], args['dataset']), progress_bar,
+                  args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
 
-    # Log
-    if args['neptune']:
-        neptune_log['train/learning_rate'].log(optimizer.param_groups[0]['lr'])
-        neptune_log['train/loss'].log(avg_train_loss)
-    if args['tensorboard']:
-        tensorboard_log.add_scalar('train/learning_rate', optimizer.param_groups[0]['lr'], epoch)
-        tensorboard_log.add_scalar('train/loss', avg_train_loss, epoch)
+# Train + Validate
+trainer.train(model, optimizer, train_loader, val_loader, scheduler)
 
-    # Validate
-    model.eval()
-    val_loss = 0.0
-    with torch.no_grad():  # No gradients needed during validation
-        for batch_idx, (image, label) in enumerate(val_loader):
-            output = model(image)
-            loss = criterion(output, label)
-            val_loss += loss.item()
-            progress_bar.desc = f"Epoch {epoch} ({epoch + 1}/{args['epochs']}), Validation, Batch {batch_idx} ({batch_idx + 1}/{len(val_loader)})"
-            progress_bar.update(1)
-    val_loss = val_loss / len(val_loader)
-
-    # Log
-    if args['neptune']:
-        neptune_log['val/loss'].log(val_loss)
-    if args['tensorboard']:
-        tensorboard_log.add_scalar('val/loss', val_loss, epoch)
-
-    # Save weights
-    save_checkpoint(args['outputs'], run_name, model, optimizer, scheduler, epoch, train_loss, val_loss, args)
-
+# Close loggers
 if args['neptune']:
     neptune_log.stop()
 if args['tensorboard']:

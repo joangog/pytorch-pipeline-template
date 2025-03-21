@@ -6,7 +6,7 @@ from torchvision import transforms
 
 def split_dataset(dataset, val_ratio, test_ratio, random=True):
     """
-    Function for splitting the dataset into training and test sets.
+    Splits the dataset into training and test sets.
     :param dataset: Dataset object to split.
     :param ratio: Ratio of dataset to use for training.
     :param random: Whether to choose random or consecutive samples for the subsets.
@@ -34,7 +34,7 @@ def split_dataset(dataset, val_ratio, test_ratio, random=True):
 
 def collate_fn(batch):
     """
-    Function for collating a list of (image, label) pairs into a batch consisting of two tensors: images, labels.
+    Collates a list of (image, label) pairs into a batch consisting of two tensors: images, labels.
     :param batch: The list of (image, label) pairs.
     :return: The two tensors: images and labels.
     """
