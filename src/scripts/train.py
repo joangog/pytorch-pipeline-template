@@ -38,7 +38,8 @@ parser.add_argument('--momentum', type=float, nargs='?', help='Momentum')
 parser.add_argument('--weight_decay', type=float, nargs='?', help='Weight decay')
 parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, 'None', 'StepLR'],
                     help='Learning rate scheduler')
-parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')
+parser.add_argument('--folds', '-f', type=int, nargs='?', help='Number of folds for cross validation')
+parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')  # TODO Early stopping
 parser.add_argument('--device', type=str, nargs='?', default="cpu", choices=['cpu', 'cuda'],
                     help='Device type to use (cpu, cuda)')
 parser.add_argument('--gpus', type=int, nargs="*", help='GPU devices to use')
@@ -110,7 +111,7 @@ trainer = Trainer(criterion, validator, args['epochs'], run_name,
                   args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
 
 # Train + Validate
-trainer.train(model, optimizer, train_loader, val_loader, scheduler, initial_epoch)
+results = trainer.train(model, optimizer, train_loader, val_loader, scheduler, initial_epoch)
 
 # Close loggers
 if args['neptune']:

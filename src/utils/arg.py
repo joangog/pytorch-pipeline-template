@@ -7,13 +7,13 @@ from src.utils.path import PATH
 
 def validate_args(args, parser):
     """
-    Validates the arguments passed to the script.
+    Validates the arguments passed to the script using hard-coded constraints.
     :param args: The args.
     :return: The args with some overridden values if needed.
     """
 
     # Args that can be None
-    none_args = ['weights', 'gpus', 'data', 'outputs', 'scheduler']
+    none_args = ['weights', 'gpus', 'data', 'outputs', 'scheduler', 'folds']
 
     # Override values from the config file under conditions
     if not args['data']:
@@ -76,8 +76,10 @@ def update_missing_args(args):
     updated_args = {}
     config = read_config(args['config'])
     for key, value in args.items():
-        if value is not None:
-            updated_args[key] = value
+        if value is not None:  # If the argument value is not missing
+            updated_args[key] = value  # Use the argument value
         else:
-            updated_args[key] = config[key]
+            if key not in config:  # If the argument value is missing
+                raise KeyError(f'Argument "{key}" is missing from configuration file. Perhaps file is deprecated.')
+            updated_args[key] = config[key]  # Use value from config file
     return updated_args

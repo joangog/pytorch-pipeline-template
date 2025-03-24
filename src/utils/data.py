@@ -50,6 +50,8 @@ def split_dataset(dataset, val_ratio, test_ratio, split_type=None, seed=42):
     else:
         raise ValueError('Invalid split type. Please choose from "random", "stratify", or "None"')
 
+    # TODO: implement splitting for cross-validation (you might use scikit.kfold but think about how to make stratified ones)
+
     train_set = Subset(dataset, train_idx)
     val_set = Subset(dataset, val_idx)
     test_set = Subset(dataset, test_idx)

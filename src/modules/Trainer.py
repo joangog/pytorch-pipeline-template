@@ -1,5 +1,8 @@
 from tqdm import tqdm
+from copy import deepcopy
+from torch.utils.data import ConcatDataset, DataLoader
 
+from src.utils.data import collate_fn
 from src.utils.model import save_checkpoint
 
 
@@ -101,8 +104,8 @@ class Trainer(object):
         :param train_loader: The training data loader or a list of training data loaders for cross validation.
         :param val_loader: The validation data loader, or a list of validation data loaders for cross validations.
         :param scheduler: The scheduler instance.
-        :param fold: The current fold for cross-validation.
         :param initial_epoch: The initial epoch to start from (can be other than 0 when resuming).
+        :param fold: The current fold for cross-validation.
         :return:
         """
 
@@ -129,12 +132,16 @@ class Trainer(object):
             if self.neptune:
                 self.neptune_log['learning_rate'].log(optimizer.param_groups[0]['lr'])
                 self.neptune_log['loss/train'].log(train_loss)
-                self.neptune_log['loss/val'].log(val_loss)
+                if val_loss:
+                    self.neptune_log['loss/val'].log(val_loss)
                 for val_metric_name, val_metric_value in val_metrics.items():
                     self.neptune_log[f'{val_metric_name}/val'].log(val_metric_value)
             if self.tensorboard:
                 self.tensorboard_log.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], epoch)
-                self.tensorboard_log.add_scalars('loss', {'train': train_loss, 'val': val_loss}, epoch)
+                if val_loss:
+                    self.tensorboard_log.add_scalars('loss', {'train': train_loss, 'val': val_loss}, epoch)
+                else:
+                    self.tensorboard_log.add_scalars('loss', {'train': train_loss}, epoch)
                 for val_metric_name, val_metric_value in val_metrics.items():
                     self.tensorboard_log.add_scalar(f'{val_metric_name}/val', val_metric_value, epoch)
 
@@ -143,7 +150,7 @@ class Trainer(object):
     def train_folds(self, model, optimizer, train_loaders, val_loaders, scheduler=None, initial_epoch=0,
                     initial_fold=0):
         """
-        Performs full training + validation loop for each fold using cross validation.
+        Performs full training + validation loop for all folds using cross validation.
         :param model: The model instance.
         :param optimizer: The optimizer instance.
         :param train_loaders: A list of training data loaders for each fold.
@@ -151,20 +158,39 @@ class Trainer(object):
         :param scheduler: The scheduler instance.
         :return:
         """
+        # Cross validation check
         if len(train_loaders) != len(val_loaders):  # If both are lists but not the same length
             raise ValueError(
                 'For cross-validation, the train_loader and val_loader must both have the same length (as big as the number of folds).')
 
-        # Cross-validation Loop
+        # Initialize
+        model_copy = deepcopy(model)  # Make a copy so each fold training run is completely independent of the other
+        optimizer_copy = deepcopy(optimizer)
+        scheduler_copy = deepcopy(scheduler)
+        val_metrics = dict()
         folds = len(train_loaders)
-        for fold_i in range(min(initial_fold, folds), folds):
-            tqdm.write(f'Fold {fold_i}')
 
-            train_loader = train_loaders[fold_i]
-            val_loader = val_loaders[fold_i]
+        # Cross-validation Loop
+        for fold in range(min(initial_fold, folds), folds):
+            tqdm.write(f'Fold {fold}')
 
-            self.train(model, optimizer, train_loader, val_loader, scheduler, initial_epoch, fold_i)
+            train_loader = train_loaders[fold]
+            val_loader = val_loaders[fold]
 
-        # After everything is done retrain using train+val as all data and save in fold_all folder
+            # Train + Validate
+            _, val_metrics[fold] = self.train(model, optimizer, train_loader, val_loader, scheduler,
+                                              initial_epoch, fold)
+
+        # TODO: perhaps we might need to rethink of something with the progress bar. we are using only one progress bar object but i want the folds to have each one their own progress bar (perhaps we can do multiprocessing)
+        tqdm.write(f'Retrain on training + validation data')
+
+        # Retrain using train+val set
+        trainval_set = ConcatDataset([train_loaders[0].dataset, val_loaders[0].dataset])
+        trainval_loader = DataLoader(trainval_set, batch_size=train_loaders[0].batch_size, shuffle=True,
+                                     collate_fn=collate_fn)
+        # TODO: continue implementing here
+        self.train(model_copy, optimizer_copy, trainval_loader, trainval_loader, scheduler_copy, initial_epoch)
+
+        # and save in fold_all folder
         # Also print average train loss val loss and metrics (because when we train on all we dont have an evaluation dataset, only perhaps  test dataset)
         # Maybe also summarize all fold metrics

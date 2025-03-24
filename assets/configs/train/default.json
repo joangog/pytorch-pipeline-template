@@ -11,6 +11,7 @@
   "momentum": 0.9,
   "weight_decay": 1e-4,
   "scheduler": "StepLR",
+  "folds": null,
   "patience": 10,
   "device": "cpu",
   "gpus": null,
