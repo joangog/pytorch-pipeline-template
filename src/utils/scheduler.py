@@ -8,5 +8,5 @@ def select_scheduler(name, optimizer, args):
     elif name is None:
         return None
     else:
-        raise Exception('Unknown scheduler')
+        raise ValueError('Unknown scheduler')
     return scheduler

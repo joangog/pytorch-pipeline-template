@@ -6,3 +6,4 @@ neptune
 tensorboard
 pillow
 numpy
+scikit-learn

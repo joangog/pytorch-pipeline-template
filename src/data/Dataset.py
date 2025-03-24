@@ -4,7 +4,7 @@ from PIL import Image
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, image_dir, label_file, transform=None, label_to_int_map=None):
+    def __init__(self, image_dir, label_file, transform=None, label_to_int_map=None, ):
         self.image_dir = image_dir
         self.label_file = label_file
         self.transform = transform
@@ -13,8 +13,6 @@ class Dataset(torch.utils.data.Dataset):
 
         self.images, self.image_ext = self._load_images(image_dir)  # List of image names and the image file extension
         self.labels = self._load_labels(label_file)  # List of labels
-
-        self.num_classes = len(set([label for label in self.labels.values()]))
 
     def _label_to_int(self, label):
         if self.label_to_int_map is None:

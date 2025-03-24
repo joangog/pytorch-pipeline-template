@@ -15,7 +15,7 @@ def suppress_logger_info():
     logging.getLogger("tensorboard").setLevel(logging.ERROR)
 
 
-def init_neptune_logger(run_name, start_epoch, args):
+def init_neptune_logger(run_name, initial_epoch, args):
     with open(PATH['NEPTUNE_CONFIG']) as file:
         neptune_config = json.load(file)
     neptune_log = neptune.init_run(project=neptune_config['project'], api_token=neptune_config['api_token'],
@@ -24,7 +24,7 @@ def init_neptune_logger(run_name, start_epoch, args):
                                    # mode='offline',
                                    name=run_name, tags=[args['dataset'], args['model']])
     neptune_log['parameters'] = {'phase': 'train', 'dataset': args['dataset'], 'model': args['model'],
-                                 'weights': str(args['weights']), 'start_epoch': start_epoch,
+                                 'weights': str(args['weights']), 'initial_epoch': initial_epoch,
                                  'batch': args['batch'], 'epochs': args['epochs'],
                                  'learning_rate': args['learning_rate'], 'momentum': args['momentum'],
                                  'weight_decay': args['weight_decay'], 'patience': args['patience'],

@@ -92,8 +92,8 @@ class Validator(Evaluator):
         :return: A dictionary with the average metric values.
         """
         # tqdm_desc_func is a function for generating a description string for the tqdm progress bar
-        tqdm_desc_func = lambda epoch, batch_idx: (f"Epoch {epoch} ({epoch + 1}/{self.total_epochs}), Validation, "
-                                                   f"Batch {batch_idx} ({batch_idx + 1}/{len(val_loader)})")
+        tqdm_desc_func = lambda epoch, batch_idx: (f"Epoch {epoch} ({epoch + 1}/{self.total_epochs}): "
+                                                   f"Validation Batch {batch_idx} ({batch_idx + 1}/{len(val_loader)})")
         metric_vals = super().evaluate(model, val_loader, lambda batch_idx: tqdm_desc_func(epoch, batch_idx))
 
         return metric_vals

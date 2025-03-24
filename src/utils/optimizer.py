@@ -6,5 +6,5 @@ def select_optimizer(name, params, args):
         optimizer = SGD(params, lr=args['learning_rate'], momentum=args['momentum'],
                         weight_decay=args['weight_decay'])
     else:
-        raise Exception('Unknown optimizer')
+        raise ValueError('Unknown optimizer')
     return optimizer

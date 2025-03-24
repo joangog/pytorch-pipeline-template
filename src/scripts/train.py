@@ -5,15 +5,13 @@ from torch.utils.data import DataLoader
 from torch import nn
 from torchmetrics.classification import AUROC
 
-from src.data.CIFAR10 import CIFAR10  # Seems unused but it actually isn't
-from src.models.CIFARModel import CIFARModel  # Seems unused but it actually isn't
 from src.modules.Evaluator import Validator
 from src.modules.Trainer import Trainer
 from src.utils.logging import suppress_logger_info, init_neptune_logger, init_tensorboard_logger
 from src.utils.path import PATH, make_project_dirs
 from src.utils.arg import validate_args, update_missing_args
-from src.utils.data import split_dataset, collate_fn
-from src.utils.model import load_checkpoint
+from src.utils.data import split_dataset, collate_fn, select_dataset
+from src.utils.model import load_checkpoint, select_model
 from src.utils.optimizer import select_optimizer
 from src.utils.scheduler import select_scheduler
 from src.utils.helper import gen_run_name, set_seed
@@ -38,7 +36,6 @@ parser.add_argument('--learning-rate', '-lr', type=float, nargs='?', help='Learn
 parser.add_argument('--optimizer', '-opt', type=str, nargs='?', choices=['SGD'], help='Optimizer')
 parser.add_argument('--momentum', type=float, nargs='?', help='Momentum')
 parser.add_argument('--weight_decay', type=float, nargs='?', help='Weight decay')
-# TODO: Make scheduler optional
 parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, 'None', 'StepLR'],
                     help='Learning rate scheduler')
 parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')
@@ -64,32 +61,33 @@ args = validate_args(args, parser)  # Validate args from config file
 set_seed(args['seed'])  # Set seed
 make_project_dirs()  # Make all essential directories
 run_name = gen_run_name(args)  # Generate run name using args
-
-print('Run name: ', run_name)
+tqdm.write('Run name: ' + run_name)
 
 # Load dataset, split into subsets and generate loaders
-dataset = globals()[args['dataset']](args['data'])
-train_set, val_set, test_set = split_dataset(dataset, val_ratio=0.2, test_ratio=0.2, random=True)
+dataset = select_dataset(args['dataset'], args)
+train_set, val_set, test_set = split_dataset(dataset, val_ratio=0.2, test_ratio=0.2, split_type='stratify',
+                                             seed=args['seed'])
 train_loader = DataLoader(train_set, batch_size=args['batch'], shuffle=True, collate_fn=collate_fn)
 val_loader = DataLoader(val_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
 test_loader = DataLoader(test_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
 
 # Load model, optimizer and scheduler
-model = globals()[args['model']]()
+model = select_model(args['model'], args)
 optimizer = select_optimizer(args['optimizer'], model.parameters(), args)
 scheduler = select_scheduler(args['scheduler'], optimizer, args)
-start_epoch = 0
+initial_epoch = 0
 if args['weights']:  # Load state from checkpoint
-    print('Loading checkpoint from ', args['weights'])
-    model, optimizer, scheduler, start_epoch = load_checkpoint(args['weights'], model, optimizer, scheduler,
-                                                               args['resume'])
+    tqdm.write('Loading checkpoint from ' + args['weights'])
+    model, optimizer, scheduler, initial_epoch, start_fold = load_checkpoint(args['weights'], model, optimizer,
+                                                                             scheduler,
+                                                                             args['resume'])
 
 # Initialize logging
 neptune_log = None
 tensorboard_log = None
 suppress_logger_info()  # Supress logger info messages
 if args['neptune']:
-    neptune_log = init_neptune_logger(run_name, start_epoch, args)
+    neptune_log = init_neptune_logger(run_name, initial_epoch, args)
 if args['tensorboard']:
     tensorboard_log = init_tensorboard_logger(run_name, args)
 
@@ -101,18 +99,18 @@ metrics = {'auc': AUROC(task="multiclass", num_classes=dataset.num_classes)}
 
 # TRAINING/VALIDATION LOOP -------------------------------------------------------------------------------------------
 
-print('Training...')
+tqdm.write('Training...')
 
-progress_bar = tqdm(total=args['epochs'] * (len(train_loader) + len(val_loader)), initial=start_epoch)
-
-# Initialize training modules
+# Initialize pipeline modules
+progress_bar = tqdm(total=(args['epochs'] - initial_epoch) * (len(train_loader) + len(val_loader)),
+                    initial=initial_epoch)
 validator = Validator(metrics, progress_bar, args['epochs'])
 trainer = Trainer(criterion, validator, args['epochs'], run_name,
                   os.path.join(args['outputs'], 'checkpoints', args['model'], args['dataset']), progress_bar,
                   args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
 
 # Train + Validate
-trainer.train(model, optimizer, train_loader, val_loader, scheduler)
+trainer.train(model, optimizer, train_loader, val_loader, scheduler, initial_epoch)
 
 # Close loggers
 if args['neptune']:

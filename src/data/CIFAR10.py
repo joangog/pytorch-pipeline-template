@@ -21,3 +21,5 @@ class CIFAR10(Dataset):
         }
 
         super().__init__(image_dir, label_file, transform=None, label_to_int_map=label_to_int_map)
+
+        self.num_classes = len(set([label for label in self.labels.values()]))
