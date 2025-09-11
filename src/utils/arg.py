@@ -24,7 +24,7 @@ def validate_args(args, parser):
         if args[arg] == 'None' or args[arg] == 'null':
             args[arg] = None
 
-    # Check expected types for arguments/actions according to parser
+    # Check expected types for arguments/actions according to parser defined in the code
     for action in parser._actions:
         if action.dest == 'help':  # If helper_action, do not check
             continue

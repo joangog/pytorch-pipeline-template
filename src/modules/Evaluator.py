@@ -71,7 +71,6 @@ class Evaluator(object):
 class Validator(Evaluator):
     """
     An Evaluator class specifically for validation during learning.
-
     """
 
     def __init__(self, metrics, tqdm_progress_bar=None, total_epochs=None):
@@ -102,7 +101,6 @@ class Validator(Evaluator):
 class Tester(Evaluator):
     """
     An Evaluator class specifically for testing.
-
     """
 
     def __init__(self, metrics, tqdm_progress_bar=None):
