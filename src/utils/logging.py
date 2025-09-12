@@ -24,7 +24,7 @@ def init_neptune_logger(run_name, initial_epoch, args):
                                    # mode='offline',
                                    name=run_name, tags=[args['dataset'], args['model']])
     neptune_log['parameters'] = {'phase': 'train', 'dataset': args['dataset'], 'model': args['model'],
-                                 'weights': str(args['weights']), 'initial_epoch': initial_epoch,
+                                 'checkpoint_path': str(args['checkpoint_path']), 'initial_epoch': initial_epoch,
                                  'batch': args['batch'], 'epochs': args['epochs'],
                                  'learning_rate': args['learning_rate'], 'momentum': args['momentum'],
                                  'weight_decay': args['weight_decay'], 'patience': args['patience'],

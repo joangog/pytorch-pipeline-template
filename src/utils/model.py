@@ -1,12 +1,12 @@
 import os
 import torch
 
-from src.models.CIFARModel import CIFARModel
+from src.models.RegressionModel import RegressionModel
 
 
-def select_model(name, args):
-    if name == 'CIFARModel':
-        return CIFARModel()
+def select_model(name, dataset):
+    if name == 'RegressionModel':
+        return RegressionModel(n_outputs=dataset.n_labels)
     else:
         raise ValueError('Unknown model')
 
@@ -25,15 +25,15 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resu
     # TODO: Check edge case where we resume from checkpoint but change the learning rate or another hyperparam
     # In that case not only we would need to load the model/opt/sched, but also update the args with the loaded hyperparameters otherwise the object hyps and the arg hyps are conflicting
     checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint['model_state_dict'])  # Load model weights
+    model.load_state_dict(checkpoint['model_state_dict'])  # Load model weights from checkpoint
     initial_epoch = 0
     initial_fold = 0 if cross_validation else None
     if resume:  # If resuming training from last epoch, then load optimizer and scheduler states
         initial_epoch = checkpoint[
-                            'epoch'] + 1  # If the weights for that epoch are saved, it means that epoch is complete
+                            'epoch'] + 1  # If the checkpoint for that epoch is saved, it means that epoch is complete
         # TODO: fix fold resuming, because if last fold what do you do, if fold all what do you do
         initial_fold = checkpoint[
-            'fold'] if cross_validation else None  # If the weights for the last epoch of that fold are saved, then the next fold is iterated automatically because we will be at last_epoch1
+            'fold'] if cross_validation else None  # If the checkpoint for the last epoch of that fold is saved, then the next fold is iterated automatically because we will be at last_epoch1
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if scheduler:
             scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -42,7 +42,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resu
 
 def load_weights(checkpoint_path, model):
     """
-    Loads model state from given checkpoint path. Useful for loading weights for inference.
+    Loads model weights from given checkpoint path. Useful for loading weights for inference.
     :param checkpoint_path: The checkpoint path.
     :param model: The model instance.
     :return: The updated model.

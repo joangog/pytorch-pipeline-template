@@ -1,11 +1,11 @@
 {
-  "dataset": "CIFAR10",
-  "data": null,
-  "outputs": null,
-  "model": "CIFARModel",
-  "weights": null,
+  "dataset": "CharacteristicsDataset",
+  "data_path": null,
+  "outputs_path": null,
+  "model": "RegressionModel",
+  "checkpoint_path": null,
   "batch": 16,
-  "device": "cpu",
+  "device": "gpu",
   "gpus": null,
   "seed": 42
 }

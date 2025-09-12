@@ -3,14 +3,13 @@ import os
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from torch import nn
-from torchmetrics.classification import AUROC
 
 from src.modules.Evaluator import Validator
 from src.modules.Trainer import Trainer
 from src.utils.logging import suppress_logger_info, init_neptune_logger, init_tensorboard_logger
 from src.utils.path import PATH, make_project_dirs
-from src.utils.arg import validate_args, update_missing_args
-from src.utils.data import split_dataset, collate_fn, select_dataset
+from src.utils.arg import validate_args, update_missing_args, read_config
+from src.utils.data import split_dataset, select_dataset, collate_fn
 from src.utils.model import load_checkpoint, select_model
 from src.utils.optimizer import select_optimizer
 from src.utils.scheduler import select_scheduler
@@ -21,16 +20,20 @@ from src.utils.helper import gen_run_name, set_seed
 parser = argparse.ArgumentParser(description='Pytorch model training script')
 
 # Config argument
-parser.add_argument('--config', type=str, default=PATH['DEFAULT_TRAIN_CONFIG'],
+parser.add_argument('--config_path', '-c', type=str, default=PATH['DEFAULT_TRAIN_CONFIG'],
                     help='Path to config file with default optional argument values')
 
 # Value arguments (default values not set here are set by the default.json configs file)
-parser.add_argument('--dataset', '-D', type=str, nargs='?', choices=['CIFAR10'], help='Dataset name')
-parser.add_argument('--data', '-d', type=str, nargs='?', help='Path to data folder')
-parser.add_argument('--outputs', '-o', type=str, nargs='?', help='Path to outputs folder')
-parser.add_argument('--model', '-M', type=str, nargs='?', choices=['CIFARModel'], help='Model name')
-parser.add_argument('--weights', '-w', type=str, nargs='?', help='Path to model checkpoint')
+parser.add_argument('--dataset', '-ds', type=str, nargs='?', choices=['CharacteristicsDataset'], help='Dataset name')
+parser.add_argument('--data_path', '-d', type=str, nargs='?', help='Path to data folder')
+parser.add_argument('--dataset_split_type', '-dst', type=str, nargs='?',
+                    help='Method to split the dataset into train/val/test sets')
+# parser.add_argument('--dataset_split_path', '-dsp', type=str, nargs='?', help='Path to file with dataset split indices')
+parser.add_argument('--outputs_path', '-o', type=str, nargs='?', help='Path to outputs folder')
+parser.add_argument('--model', '-m', type=str, nargs='?', choices=['RegressionModel'], help='Model name')
+parser.add_argument('--checkpoint_path', '-w', type=str, nargs='?', help='Path to model checkpoint')
 parser.add_argument('--batch', '-b', type=int, nargs='?', help='Batch size')
+parser.add_argument('--loss', type=str, nargs='?', choices=['MSE', 'MAE', 'BCE', 'CE'], help='Loss function')
 parser.add_argument('--epochs', '-e', type=int, nargs='?', help='Number of epochs')
 parser.add_argument('--learning-rate', '-lr', type=float, nargs='?', help='Learning rate')
 parser.add_argument('--optimizer', '-opt', type=str, nargs='?', choices=['SGD'], help='Optimizer')
@@ -58,28 +61,37 @@ args = validate_args(args, parser)  # Validate args from config file
 
 # INITIALIZATION -------------------------------------------------------------------------------------------------------
 
+tqdm.write('')
+
 # Initialize setup
+if args['resume'] and args['checkpoint_path']:  # If resuming run from checkpoint
+    args = read_config(os.path.join(args['checkpoint_path'], 'config.json'))  # Load args from checkpoint config file
+    tqdm.write(f"Resuming run: {args['checkpoint_path'].split(os.sep)[-3]}. "
+               f"Script arguments will be ignored and loaded from checkpoint configuration file.")
+run_name = gen_run_name(args)  # Generate run name using args
+tqdm.write(f'Run name: {run_name}\n')
+tqdm.write('Run arguments:')
+for arg, value in args.items():
+    tqdm.write(f'  {arg}: {value}')
 set_seed(args['seed'])  # Set seed
 make_project_dirs()  # Make all essential directories
-run_name = gen_run_name(args)  # Generate run name using args
-tqdm.write('Run name: ' + run_name)
 
 # Load dataset, split into subsets and generate loaders
 dataset = select_dataset(args['dataset'], args)
-train_set, val_set, test_set = split_dataset(dataset, val_ratio=0.2, test_ratio=0.2, split_type='stratify',
+train_set, val_set, test_set = split_dataset(dataset, val_ratio=0.2, test_ratio=0.2, split_type='random',
                                              seed=args['seed'])
 train_loader = DataLoader(train_set, batch_size=args['batch'], shuffle=True, collate_fn=collate_fn)
 val_loader = DataLoader(val_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
 test_loader = DataLoader(test_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
 
 # Load model, optimizer and scheduler
-model = select_model(args['model'], args)
+model = select_model(args['model'], dataset)
 optimizer = select_optimizer(args['optimizer'], model.parameters(), args)
 scheduler = select_scheduler(args['scheduler'], optimizer, args)
 initial_epoch = 0
-if args['weights']:  # Load state from checkpoint
-    tqdm.write('Loading checkpoint from ' + args['weights'])
-    model, optimizer, scheduler, initial_epoch, start_fold = load_checkpoint(args['weights'], model, optimizer,
+if args['checkpoint_path']:  # Load state from checkpoint
+    tqdm.write('Loading checkpoint from ' + args['checkpoint_path'])
+    model, optimizer, scheduler, initial_epoch, start_fold = load_checkpoint(args['checkpoint_path'], model, optimizer,
                                                                              scheduler,
                                                                              args['resume'])
 
@@ -93,10 +105,10 @@ if args['tensorboard']:
     tensorboard_log = init_tensorboard_logger(run_name, args)
 
 # Define loss function
-criterion = nn.CrossEntropyLoss()
+criterion = nn.MSELoss()
 
 # Define evaluation metrics
-metrics = {'auc': AUROC(task="multiclass", num_classes=dataset.num_classes)}
+metrics = {'mse': nn.MSELoss}
 
 # TRAINING/VALIDATION LOOP -------------------------------------------------------------------------------------------
 
@@ -107,7 +119,7 @@ progress_bar = tqdm(total=(args['epochs'] - initial_epoch) * (len(train_loader) 
                     initial=initial_epoch)
 validator = Validator(metrics, progress_bar, args['epochs'])
 trainer = Trainer(criterion, validator, args['epochs'], run_name,
-                  os.path.join(args['outputs'], 'checkpoints', args['model'], args['dataset']), progress_bar,
+                  os.path.join(args['outputs_path'], 'checkpoints', args['model'], args['dataset']), progress_bar,
                   args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
 
 # Train + Validate

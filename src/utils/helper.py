@@ -23,8 +23,8 @@ def gen_run_name(args):
 
     # If we are resuming a previous run
     if args['resume']:
-        # Get run_name from the run folder of the weights we are using to resume from
-        run_name = args['weights'].split(os.sep)[-2]
+        # Get run_name from the run folder of the checkpoint we are using to resume from
+        run_name = args['checkpoint_path'].split(os.sep)[-2]
     else:
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         run_name = 'run_e{}_b{}_lr{}_m{}_w{}_p{}_s{}_time_{}'.format(args['epochs'], args['batch'],

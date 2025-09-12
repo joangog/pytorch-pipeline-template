@@ -1,14 +1,14 @@
 import torch.nn as nn
 
 
-class CIFARModel(nn.Module):
-    def __init__(self, input_shape=(3, 32, 32), n_classes=10) -> None:
+class RegressionModel(nn.Module):
+    def __init__(self, input_shape=(3, 127, 127), n_outputs=1) -> None:
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels=input_shape[0], out_channels=16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.fc1 = nn.Linear(32 * 16 * 16, n_classes)
+        self.fc1 = nn.Linear(32 * 16 * 16, n_outputs)
 
     def forward(self, x):
         x = self.conv1(x)

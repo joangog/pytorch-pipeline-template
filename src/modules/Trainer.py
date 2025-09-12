@@ -1,9 +1,11 @@
+import os
 from tqdm import tqdm
 from copy import deepcopy
 from torch.utils.data import ConcatDataset, DataLoader
 
 from src.utils.data import collate_fn
 from src.utils.model import save_checkpoint
+from src.utils.arg import save_config
 
 
 class Trainer(object):
@@ -11,7 +13,7 @@ class Trainer(object):
     A class for training the model.
     """
 
-    def __init__(self, criterion, validator, epochs, run_name, save_checkpoint_path, tqdm_progress_bar=None,
+    def __init__(self, criterion, validator, epochs, run_name, run_args, save_checkpoint_path, tqdm_progress_bar=None,
                  neptune=False, neptune_log=None, tensorboard=False, tensorboard_log=None, ):
         """
         :param criterion: The loss criterion instance.
@@ -19,6 +21,7 @@ class Trainer(object):
         :param tqdm_progress_bar: A tqdm progress bar instance.
         :param epochs: The total number of epochs.
         :param run_name: The name of the run.
+        :param run_args: The arguments of the run script.
         :param save_checkpoint_path: The path to the directory of saved checkpoints for the specific model and dataset.
         ;param tqdm_progress_bar: A tqdm progress bar instance.
         :param neptune: If True, neptune logging is enabled.
@@ -31,6 +34,7 @@ class Trainer(object):
         self.tqdm_progress_bar = tqdm_progress_bar
         self.epochs = epochs
         self.run_name = run_name
+        self.run_args = run_args
         self.save_checkpoint_path = save_checkpoint_path
         self.tqdm_progress_bar = tqdm_progress_bar
         self.neptune = neptune
@@ -122,9 +126,13 @@ class Trainer(object):
                 val_metrics = self.validator.evaluate(model, val_loader, epoch)
             val_loss = val_metrics.pop('loss', None)  # Extract val loss from val metrics
 
-            # Save weights
+            # Save checkpoint
             save_checkpoint(self.save_checkpoint_path, self.run_name, model, optimizer, scheduler, epoch,
                             train_loss, val_loss, fold)
+
+            # Save run configs
+            save_config(self.run_args, os.path.join(self.save_checkpoint_path, self.run_name, 'config.json'))
+
             # Log
             self.tqdm_progress_bar.set_postfix(train_loss=train_loss, val_loss=val_loss,
                                                **{f'val_{metric}': metric_value for metric, metric_value in

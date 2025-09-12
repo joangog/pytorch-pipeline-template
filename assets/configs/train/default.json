@@ -1,10 +1,12 @@
 {
-  "dataset": "CIFAR10",
-  "data": null,
-  "outputs": null,
-  "model": "CIFARModel",
-  "weights": null,
+  "dataset": "CharacteristicsDataset",
+  "data_path": "D:\\Datasets\\AI4AI\\AI4AI_YES_FFR_IFR_RFR",
+  "dataset_split_type": "stratified",
+  "outputs_path": null,
+  "model": "RegressionModel",
+  "checkpoint_path": null,
   "batch": 16,
+  "loss": "MSE",
   "epochs": 2,
   "learning_rate": 1e-3,
   "optimizer": "SGD",
@@ -13,7 +15,7 @@
   "scheduler": "StepLR",
   "folds": null,
   "patience": 10,
-  "device": "cpu",
+  "device": "gpu",
   "gpus": null,
   "seed": 42
 }

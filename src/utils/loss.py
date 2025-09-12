@@ -1,5 +1,13 @@
-def select_loss(name, args):
-    # perhaps load the function directly from the name (e.g. using the name, use the loss function name())
-    # if name == '':
-    # else:
-    #     raise ValueError('Unknown loss')
+from torch import nn
+
+def select_loss(name):
+    if name == 'MSE':
+        return nn.MSELoss()
+    elif name == 'MAE':
+        return nn.L1Loss()
+    elif name == 'BCE':
+        return nn.BCELoss()
+    elif name == 'CE':
+        return nn.CrossEntropyLoss()
+    else:
+        raise ValueError('Unknown loss')
