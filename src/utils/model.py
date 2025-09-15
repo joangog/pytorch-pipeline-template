@@ -1,12 +1,12 @@
 import os
 import torch
 
-from src.models.RegressionModel import RegressionModel
+from src.models.CIFARModel import CIFARModel
 
 
 def select_model(name, dataset):
-    if name == 'RegressionModel':
-        return RegressionModel(n_outputs=dataset.n_labels)
+    if name == 'CIFARModel':
+        return CIFARModel(n_classes=dataset.n_labels)
     else:
         raise ValueError('Unknown model')
 

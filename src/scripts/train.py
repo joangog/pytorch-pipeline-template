@@ -1,6 +1,7 @@
 import argparse
 import os
 from tqdm import tqdm
+from torchmetrics import AUROC
 from torch.utils.data import DataLoader
 from torch import nn
 
@@ -12,6 +13,7 @@ from src.utils.arg import validate_args, update_missing_args, read_config
 from src.utils.data import split_dataset, select_dataset, collate_fn
 from src.utils.model import load_checkpoint, select_model
 from src.utils.optimizer import select_optimizer
+from src.utils.loss import select_loss
 from src.utils.scheduler import select_scheduler
 from src.utils.helper import gen_run_name, set_seed
 
@@ -105,10 +107,10 @@ if args['tensorboard']:
     tensorboard_log = init_tensorboard_logger(run_name, args)
 
 # Define loss function
-criterion = nn.MSELoss()
+criterion = select_loss(args['loss'])
 
 # Define evaluation metrics
-metrics = {'mse': nn.MSELoss}
+metrics = {}  # {'auroc': AUROC}
 
 # TRAINING/VALIDATION LOOP -------------------------------------------------------------------------------------------
 

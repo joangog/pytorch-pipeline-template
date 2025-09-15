@@ -3,7 +3,7 @@ import torch
 from torch.utils.data.dataset import Subset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
-from src.data.CharacteristicsDataset import CharacteristicsDataset
+from src.data.CIFAR10 import CIFAR10
 import nibabel as nib
 
 
@@ -19,14 +19,14 @@ def sample_random_slice_window_from_nifti(nifti_path, slice_window_size):
     n_slices = img.shape[2]
     from_idx = np.random.randint(0, n_slices - slice_window_size + 1)
     to_idx = from_idx + slice_window_size
-    data = img.dataobj[:, :, from_idx:to_idx] # Allows for loading only a specific range of slices efficiently
+    data = img.dataobj[:, :, from_idx:to_idx]  # Allows for loading only a specific range of slices efficiently
     spacing = img.header.get_zooms()[:3]  # Get the first three dimensions for spacing
     return data, spacing
 
 
 def select_dataset(name, args):
-    if name == 'CharacteristicsDataset':
-        return CharacteristicsDataset(args['data_path'])
+    if name == 'CIFAR10':
+        return CIFAR10(args['data_path'])
     else:
         raise ValueError('Unknown dataset')
 
@@ -153,4 +153,3 @@ def collate_fn(batch):
     inputs = torch.stack(inputs, dim=0)
     labels = torch.tensor(labels)
     return inputs, labels
-

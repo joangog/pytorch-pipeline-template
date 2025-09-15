@@ -1,8 +1,8 @@
 {
-  "dataset": "CharacteristicsDataset",
+  "dataset": "CIFAR10",
   "data_path": null,
   "outputs_path": null,
-  "model": "RegressionModel",
+  "model": "CIFARModel",
   "checkpoint_path": null,
   "batch": 16,
   "device": "gpu",
