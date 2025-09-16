@@ -10,11 +10,11 @@ from src.modules.Trainer import Trainer
 from src.utils.logging import suppress_logger_info, init_neptune_logger, init_tensorboard_logger
 from src.utils.path import PATH, make_project_dirs
 from src.utils.arg import validate_args, update_missing_args, read_config
-from src.utils.data import split_dataset, select_dataset, collate_fn
-from src.utils.model import load_checkpoint, select_model
-from src.utils.optimizer import select_optimizer
-from src.utils.loss import select_loss
-from src.utils.scheduler import select_scheduler
+from src.utils.data import split_dataset, get_dataset, get_dataloaders, collate_fn
+from src.utils.model import load_checkpoint, get_model
+from src.utils.optimizer import get_optimizer
+from src.utils.loss import get_loss
+from src.utils.scheduler import get_scheduler
 from src.utils.helper import gen_run_name, set_seed
 
 # PARSE ARGUMENTS ------------------------------------------------------------------------------------------------------
@@ -61,74 +61,92 @@ args = vars(parser.parse_args())
 args = update_missing_args(args)  # Update args with default values from config file
 args = validate_args(args, parser)  # Validate args from config file
 
-# INITIALIZATION -------------------------------------------------------------------------------------------------------
-
-tqdm.write('')
+# INITIALIZATION ------------------------------------------------------------------------------------------------------
 
 # Initialize setup
 if args['resume'] and args['checkpoint_path']:  # If resuming run from checkpoint
-    args = read_config(os.path.join(args['checkpoint_path'], 'config.json'))  # Load args from checkpoint config file
-    tqdm.write(f"Resuming run: {args['checkpoint_path'].split(os.sep)[-3]}. "
-               f"Script arguments will be ignored and loaded from checkpoint configuration file.")
+    args = read_config(
+        os.path.join(os.path.basename(args['checkpoint_path']),
+                     'config.json'))  # Load args from checkpoint config file
+    print(f"Resuming run: {args['checkpoint_path'].split(os.sep)[-3]}. "
+          f"Script arguments will be ignored and loaded from checkpoint configuration file.")
 run_name = gen_run_name(args)  # Generate run name using args
-tqdm.write(f'Run name: {run_name}\n')
-tqdm.write('Run arguments:')
+print(f'Run name: {run_name}\n')
+print('Run arguments:')
 for arg, value in args.items():
-    tqdm.write(f'  {arg}: {value}')
+    print(f'  {arg}: {value}')
+print()
 set_seed(args['seed'])  # Set seed
 make_project_dirs()  # Make all essential directories
 
 # Load dataset, split into subsets and generate loaders
-dataset = select_dataset(args['dataset'], args)
+dataset = get_dataset(args['dataset'], args)
 train_set, val_set, test_set = split_dataset(dataset, val_ratio=0.2, test_ratio=0.2, split_type='random',
-                                             seed=args['seed'])
-train_loader = DataLoader(train_set, batch_size=args['batch'], shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
-test_loader = DataLoader(test_set, batch_size=args['batch'], shuffle=False, collate_fn=collate_fn)
-
-# Load model, optimizer and scheduler
-model = select_model(args['model'], dataset)
-optimizer = select_optimizer(args['optimizer'], model.parameters(), args)
-scheduler = select_scheduler(args['scheduler'], optimizer, args)
-initial_epoch = 0
-if args['checkpoint_path']:  # Load state from checkpoint
-    tqdm.write('Loading checkpoint from ' + args['checkpoint_path'])
-    model, optimizer, scheduler, initial_epoch, start_fold = load_checkpoint(args['checkpoint_path'], model, optimizer,
-                                                                             scheduler,
-                                                                             args['resume'])
-
-# Initialize logging
-neptune_log = None
-tensorboard_log = None
-suppress_logger_info()  # Supress logger info messages
-if args['neptune']:
-    neptune_log = init_neptune_logger(run_name, initial_epoch, args)
-if args['tensorboard']:
-    tensorboard_log = init_tensorboard_logger(run_name, args)
+                                             train_val_folds=args['folds'], seed=args['seed'])
+train_loader, val_loader, test_loader = get_dataloaders(train_set, val_set, test_set, args['batch'], collate_fn)
 
 # Define loss function
-criterion = select_loss(args['loss'])
+criterion = get_loss(args['loss'])
 
 # Define evaluation metrics
 metrics = {}  # {'auroc': AUROC}
 
-# TRAINING/VALIDATION LOOP -------------------------------------------------------------------------------------------
+# Create pipeline modules
+validator = Validator(metrics, args['epochs'])
+trainer = Trainer(criterion, validator, args['epochs'], run_name, args,
+                  os.path.join(args['outputs_path'], 'checkpoints', args['model'], args['dataset']))
 
-tqdm.write('Training...')
+# CROSS VALIDATION LOOP ------------------------------------------------------------------------------------------------
 
-# Initialize pipeline modules
-progress_bar = tqdm(total=(args['epochs'] - initial_epoch) * (len(train_loader) + len(val_loader)),
-                    initial=initial_epoch)
-validator = Validator(metrics, progress_bar, args['epochs'])
-trainer = Trainer(criterion, validator, args['epochs'], run_name,
-                  os.path.join(args['outputs_path'], 'checkpoints', args['model'], args['dataset']), progress_bar,
-                  args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
+print('\nTraining...')
 
-# Train + Validate
-results = trainer.train(model, optimizer, train_loader, val_loader, scheduler, initial_epoch)
+folds = args['folds'] if args['folds'] and args['folds'] > 1 else 1
+for fold in range(folds):
 
-# Close loggers
-if args['neptune']:
-    neptune_log.stop()
-if args['tensorboard']:
-    tensorboard_log.close()
+    print(f'\nFold {fold}')
+
+    # Get fold data loaders
+    if folds > 1:
+        fold_train_loader = train_loader[fold]
+        fold_val_loader = val_loader[fold]
+    else:
+        fold_train_loader = train_loader
+        fold_val_loader = val_loader
+
+    # Load model, optimizer and scheduler
+    model = get_model(args['model'], dataset)
+    optimizer = get_optimizer(args['optimizer'], model.parameters(), args)
+    scheduler = get_scheduler(args['scheduler'], optimizer, args)
+    initial_epoch = 0
+    if args['checkpoint_path']:  # Load state from checkpoint
+        print('Loading checkpoint from ' + args['checkpoint_path'])
+        model, optimizer, scheduler, initial_epoch, start_fold = load_checkpoint(args['checkpoint_path'], model,
+                                                                                 optimizer,
+                                                                                 scheduler,
+                                                                                 args['resume'])
+
+    # Initialize logging
+    neptune_log = None
+    tensorboard_log = None
+    suppress_logger_info()  # Supress logger info messages
+    if args['neptune']:
+        neptune_log = init_neptune_logger(run_name, initial_epoch, fold, args)
+    if args['tensorboard']:
+        tensorboard_log = init_tensorboard_logger(run_name, fold, args)
+
+    progress_bar = tqdm(total=(args['epochs'] - initial_epoch) * (len(train_loader) + len(val_loader)),
+                        initial=initial_epoch)
+
+    # Train + Validate
+    results = trainer.train(model, optimizer, fold_train_loader, fold_val_loader, scheduler, initial_epoch, fold,
+                            progress_bar, args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
+
+    # Close loggers
+    if args['neptune']:
+        neptune_log.stop()
+    if args['tensorboard']:
+        tensorboard_log.close()
+
+    progress_bar.close()
+
+# TODO: Retrain on full training + validation set

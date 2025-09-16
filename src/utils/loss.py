@@ -1,6 +1,7 @@
 from torch import nn
 
-def select_loss(name):
+
+def get_loss(name):
     if name == 'MSE':
         return nn.MSELoss()
     elif name == 'MAE':

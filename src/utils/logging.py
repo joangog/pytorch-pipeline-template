@@ -15,7 +15,7 @@ def suppress_logger_info():
     logging.getLogger("tensorboard").setLevel(logging.ERROR)
 
 
-def init_neptune_logger(run_name, initial_epoch, args):
+def init_neptune_logger(run_name, fold, initial_epoch, args):
     with open(PATH['NEPTUNE_CONFIG']) as file:
         neptune_config = json.load(file)
     neptune_log = neptune.init_run(project=neptune_config['project'], api_token=neptune_config['api_token'],
@@ -24,17 +24,17 @@ def init_neptune_logger(run_name, initial_epoch, args):
                                    # mode='offline',
                                    name=run_name, tags=[args['dataset'], args['model']])
     neptune_log['parameters'] = {'phase': 'train', 'dataset': args['dataset'], 'model': args['model'],
-                                 'checkpoint_path': str(args['checkpoint_path']), 'initial_epoch': initial_epoch,
-                                 'batch': args['batch'], 'epochs': args['epochs'],
+                                 'checkpoint_path': str(args['checkpoint_path']), 'fold': fold,
+                                 'initial_epoch': initial_epoch, 'batch': args['batch'], 'epochs': args['epochs'],
                                  'learning_rate': args['learning_rate'], 'momentum': args['momentum'],
                                  'weight_decay': args['weight_decay'], 'patience': args['patience'],
                                  'optimizer': args['optimizer'], 'seed': args['seed']}
     return neptune_log
 
 
-def init_tensorboard_logger(run_name, args):
+def init_tensorboard_logger(run_name, fold, args):
     # Potential Bug: If resuming from a previous run, sometimes the graph has double values at the interrupted epoch
-    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], args['dataset'], args['model'], run_name)
+    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], args['dataset'], args['model'], run_name, fold)
     os.makedirs(log_path, exist_ok=True)
     tensorboard_log = SummaryWriter(os.path.join(log_path))
     return tensorboard_log

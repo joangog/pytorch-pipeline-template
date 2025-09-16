@@ -4,11 +4,12 @@ import torch
 from src.models.CIFARModel import CIFARModel
 
 
-def select_model(name, dataset):
+def get_model(name, dataset):
     if name == 'CIFARModel':
-        return CIFARModel(n_classes=dataset.n_labels)
+        model = CIFARModel(n_classes=dataset.n_labels)
     else:
         raise ValueError('Unknown model')
+    return model
 
 
 def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resume=False, cross_validation=False):
@@ -22,8 +23,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resu
     :param cross_validation: Flag to determine whether cross validation is being performed or not.
     :return: The updated model, optimizer, and scheduler state, and the epoch training will start from.
     """
-    # TODO: Check edge case where we resume from checkpoint but change the learning rate or another hyperparam
-    # In that case not only we would need to load the model/opt/sched, but also update the args with the loaded hyperparameters otherwise the object hyps and the arg hyps are conflicting
     checkpoint = torch.load(checkpoint_path)
     model.load_state_dict(checkpoint['model_state_dict'])  # Load model weights from checkpoint
     initial_epoch = 0
@@ -32,6 +31,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, scheduler=None, resu
         initial_epoch = checkpoint[
                             'epoch'] + 1  # If the checkpoint for that epoch is saved, it means that epoch is complete
         # TODO: fix fold resuming, because if last fold what do you do, if fold all what do you do
+        # TODO: Implement properly because for each fold we have one model
         initial_fold = checkpoint[
             'fold'] if cross_validation else None  # If the checkpoint for the last epoch of that fold is saved, then the next fold is iterated automatically because we will be at last_epoch1
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -75,6 +75,6 @@ def save_checkpoint(save_path, run_name, model, optimizer, scheduler, epoch, tra
     if scheduler:
         checkpoint['scheduler_state_dict'] = scheduler.state_dict()
 
-    run_save_path = os.path.join(save_path, run_name, f'fold_{fold}' if fold else '')
+    run_save_path = os.path.join(save_path, run_name, f'fold_{fold}' if fold is not None else '')
     os.makedirs(run_save_path, exist_ok=True)
     torch.save(checkpoint, os.path.join(run_save_path, f'epoch_{epoch}.pth'))
