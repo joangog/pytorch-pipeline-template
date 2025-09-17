@@ -2,3 +2,4 @@
 /assets/configs/logging/
 /neptune-token.txt
 /.neptune/
+/outputs/

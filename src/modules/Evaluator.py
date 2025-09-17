@@ -6,11 +6,13 @@ class Evaluator(object):
     A class for evaluating the model using the given metrics.
     """
 
-    def __init__(self, metrics):
+    def __init__(self, metrics, device=None):
         """
         :param metrics: A dictionary of torch metric instances.
+        :param device: The device to use.
         """
         self.metrics = metrics
+        self.device = torch.device(device) if device else torch.device('cpu')
 
     def evaluate_step(self, model, batch, tqdm_progress_bar=None, tqdm_desc=None):
         """
@@ -22,14 +24,10 @@ class Evaluator(object):
         :return: A dictionary with the metric values.
         """
         image, label = batch
+        image, label = image.to(self.device), label.to(self.device)
 
         # Get predictions
         output = model(image)
-
-        # Evaluate using metrics
-        metric_vals = dict()
-        for metric_name, metric_func in self.metrics.items():
-            metric_vals[metric_name] = metric_func(output, label).item()
 
         # Update progress bar
         if tqdm_progress_bar:
@@ -37,7 +35,7 @@ class Evaluator(object):
                 tqdm_progress_bar.desc = tqdm_desc
             tqdm_progress_bar.update(1)
 
-        return metric_vals
+        return output, label
 
     def evaluate(self, model, data_loader, tqdm_progress_bar=None, tqdm_desc_func=None):
         """
@@ -54,15 +52,20 @@ class Evaluator(object):
         metric_vals = {metric: 0.0 for metric in self.metrics.keys()}  # Initialize metric values
 
         # Evaluate
+        outputs = []
+        labels = []
         with torch.no_grad():  # No gradients needed during evaluation
             for batch_idx, batch in enumerate(data_loader):
-                batch_metric_vals = self.evaluate_step(model, batch, tqdm_progress_bar, tqdm_desc_func(batch_idx))
-                for metric in self.metrics.keys():
-                    metric_vals[metric] += batch_metric_vals[metric]
+                output, label = self.evaluate_step(model, batch, tqdm_progress_bar, tqdm_desc_func(batch_idx))
+                outputs.append(output)
+                labels.append(label)
+            outputs = torch.cat(outputs)
+            labels = torch.cat(labels)
 
-        # Average metrics
-        for metric_name, metric_fun in self.metrics.items():
-            metric_vals[metric_name] = metric_vals[metric_name] / len(data_loader)
+        # Calculate metrics
+        metric_vals = dict()
+        for metric_name, metric_func in self.metrics.items():
+            metric_vals[metric_name] = metric_func(outputs, labels).item()
 
         return metric_vals
 
@@ -72,13 +75,13 @@ class Validator(Evaluator):
     An Evaluator class specifically for validation during learning.
     """
 
-    def __init__(self, metrics, total_epochs=None):
+    def __init__(self, metrics, total_epochs=None, device=None):
         """
         :param metrics: The metric instances.
-        :param tqdm_progress_bar: A tqdm progress bar instance.
         :param total_epochs: The total number of epochs.
+        :param device: The device to use.
         """
-        super(Validator, self).__init__(metrics)
+        super(Validator, self).__init__(metrics, device)
         self.total_epochs = total_epochs
 
     def evaluate(self, model, val_loader, epoch, tqdm_progress_bar=None):
@@ -103,11 +106,12 @@ class Tester(Evaluator):
     An Evaluator class specifically for testing.
     """
 
-    def __init__(self, metrics):
+    def __init__(self, metrics, device=None):
         """
         :param metrics: The metric instances.
+        :param device: The device to use.
         """
-        super(Tester, self).__init__(metrics)
+        super(Tester, self).__init__(metrics, device)
 
     def evaluate(self, model, test_loader, tqdm_progress_bar=None):
         """

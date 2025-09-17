@@ -1,7 +1,8 @@
 import argparse
 import os
 from tqdm import tqdm
-from torchmetrics import AUROC
+from torchmetrics import AUROC, Accuracy
+import torch
 from torch.utils.data import DataLoader
 from torch import nn
 
@@ -26,13 +27,13 @@ parser.add_argument('--config_path', '-c', type=str, default=PATH['DEFAULT_TRAIN
                     help='Path to config file with default optional argument values')
 
 # Value arguments (default values not set here are set by the default.json configs file)
-parser.add_argument('--dataset', '-ds', type=str, nargs='?', choices=['CharacteristicsDataset'], help='Dataset name')
+parser.add_argument('--dataset', '-ds', type=str, nargs='?', choices=['CIFAR10'], help='Dataset name')
 parser.add_argument('--data_path', '-d', type=str, nargs='?', help='Path to data folder')
 parser.add_argument('--dataset_split_type', '-dst', type=str, nargs='?',
                     help='Method to split the dataset into train/val/test sets')
 # parser.add_argument('--dataset_split_path', '-dsp', type=str, nargs='?', help='Path to file with dataset split indices')
 parser.add_argument('--outputs_path', '-o', type=str, nargs='?', help='Path to outputs folder')
-parser.add_argument('--model', '-m', type=str, nargs='?', choices=['RegressionModel'], help='Model name')
+parser.add_argument('--model', '-m', type=str, nargs='?', choices=['CIFARModel'], help='Model name')
 parser.add_argument('--checkpoint_path', '-w', type=str, nargs='?', help='Path to model checkpoint')
 parser.add_argument('--batch', '-b', type=int, nargs='?', help='Batch size')
 parser.add_argument('--loss', type=str, nargs='?', choices=['MSE', 'MAE', 'BCE', 'CE'], help='Loss function')
@@ -45,8 +46,8 @@ parser.add_argument('--scheduler', '-sch', type=str, nargs='?', choices=[None, '
                     help='Learning rate scheduler')
 parser.add_argument('--folds', '-f', type=int, nargs='?', help='Number of folds for cross validation')
 parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')  # TODO Early stopping
-parser.add_argument('--device', type=str, nargs='?', default="cpu", choices=['cpu', 'cuda'],
-                    help='Device type to use (cpu, cuda)')
+parser.add_argument('--device', type=str, nargs='?', choices=['cpu', 'gpu'],
+                    help='Device type to use (cpu, gpu)')
 parser.add_argument('--gpus', type=int, nargs="*", help='GPU devices to use')
 parser.add_argument('--seed', '-s', type=int, nargs='?', help='Random seed')
 
@@ -76,6 +77,7 @@ print('Run arguments:')
 for arg, value in args.items():
     print(f'  {arg}: {value}')
 print()
+device = torch.device('cuda' if torch.cuda.is_available() and args['device'] == 'gpu' else 'cpu')  # Set device
 set_seed(args['seed'])  # Set seed
 make_project_dirs()  # Make all essential directories
 
@@ -87,19 +89,23 @@ train_loader, val_loader, test_loader = get_dataloaders(train_set, val_set, test
 
 # Define loss function
 criterion = get_loss(args['loss'])
+criterion = criterion.to(device)
 
 # Define evaluation metrics
-metrics = {}  # {'auroc': AUROC}
+metrics = {'acc': Accuracy(task="multiclass", num_classes=dataset.n_labels),
+           'auroc': AUROC(task="multiclass", num_classes=dataset.n_labels)}
+metrics = {name: metric.to(device) for name, metric in metrics.items()}
 
 # Create pipeline modules
-validator = Validator(metrics, args['epochs'])
+validator = Validator(metrics, args['epochs'], device)
 trainer = Trainer(criterion, validator, args['epochs'], run_name, args,
-                  os.path.join(args['outputs_path'], 'checkpoints', args['model'], args['dataset']))
+                  os.path.join(args['outputs_path'], 'checkpoints', args['model'], args['dataset']), device)
 
 # CROSS VALIDATION LOOP ------------------------------------------------------------------------------------------------
 
 print('\nTraining...')
 
+metrics = []
 folds = args['folds'] if args['folds'] and args['folds'] > 1 else 1
 for fold in range(folds):
 
@@ -114,7 +120,7 @@ for fold in range(folds):
         fold_val_loader = val_loader
 
     # Load model, optimizer and scheduler
-    model = get_model(args['model'], dataset)
+    model = get_model(args['model'], dataset).to(device)
     optimizer = get_optimizer(args['optimizer'], model.parameters(), args)
     scheduler = get_scheduler(args['scheduler'], optimizer, args)
     initial_epoch = 0
@@ -138,8 +144,10 @@ for fold in range(folds):
                         initial=initial_epoch)
 
     # Train + Validate
-    results = trainer.train(model, optimizer, fold_train_loader, fold_val_loader, scheduler, initial_epoch, fold,
-                            progress_bar, args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
+    _, fold_metrics = trainer.train(model, optimizer, fold_train_loader, fold_val_loader, scheduler, initial_epoch,
+                                    fold,
+                                    progress_bar, args['neptune'], neptune_log, args['tensorboard'], tensorboard_log)
+    metrics.append(fold_metrics)
 
     # Close loggers
     if args['neptune']:
@@ -148,5 +156,8 @@ for fold in range(folds):
         tensorboard_log.close()
 
     progress_bar.close()
+
+for fold in range(folds):
+    print(f'Fold {fold} metrics: ' + str({metric: round(value, 3) for metric, value in metrics[fold].items()}))
 
 # TODO: Retrain on full training + validation set

@@ -27,12 +27,12 @@ def gen_run_name(args):
         run_name = args['checkpoint_path'].split(os.sep)[-2]
     else:
         timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        run_name = 'run_e{}_b{}_lr{}_m{}_w{}_p{}_s{}_time_{}'.format(args['epochs'], args['batch'],
-                                                                     get_decimal_digits(args['learning_rate']),
-                                                                     get_decimal_digits(args['momentum']),
-                                                                     get_decimal_digits(args['weight_decay']),
-                                                                     args['patience'],
-                                                                     args['seed'], timestamp)
+        run_name = 'run_f{}_e{}_b{}_lr{}_m{}_w{}_p{}_s{}_time_{}'.format(args['folds'], args['epochs'], args['batch'],
+                                                                         get_decimal_digits(args['learning_rate']),
+                                                                         get_decimal_digits(args['momentum']),
+                                                                         get_decimal_digits(args['weight_decay']),
+                                                                         args['patience'],
+                                                                         args['seed'], timestamp)
     return run_name
 
 

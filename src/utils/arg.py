@@ -39,7 +39,13 @@ def validate_args(args, parser):
             raise argparse.ArgumentTypeError(
                 f'The argument "{action.dest}" must be of type {" or ".join(str(t) for t in expected_types)}.')
 
-    # Check contraints
+    # Check if choices are respected
+    for action in parser._actions:
+        if action.choices and args[action.dest] not in action.choices and args[action.dest] is not None:
+            raise argparse.ArgumentTypeError(
+                f'The argument "{action.dest}" must be one of {action.choices}.')
+
+    # Check custom contraints
     if args['gpus'] is not None and args['device'] == "cpu":
         raise argparse.ArgumentTypeError('The argument "--gpus" can only be used when "--device" is set to "cuda"')
     if args['gpus'] is None and args['device'] == "cuda":

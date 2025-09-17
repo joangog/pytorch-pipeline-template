@@ -22,7 +22,7 @@ def init_neptune_logger(run_name, fold, initial_epoch, args):
                                    # Offline mode saves the files locally.
                                    # Load them online using terminal command "neptune sync -p <project-name>"
                                    # mode='offline',
-                                   name=run_name, tags=[args['dataset'], args['model']])
+                                   name=run_name + f'_fold{fold}', tags=[args['dataset'], args['model']])
     neptune_log['parameters'] = {'phase': 'train', 'dataset': args['dataset'], 'model': args['model'],
                                  'checkpoint_path': str(args['checkpoint_path']), 'fold': fold,
                                  'initial_epoch': initial_epoch, 'batch': args['batch'], 'epochs': args['epochs'],
@@ -34,7 +34,7 @@ def init_neptune_logger(run_name, fold, initial_epoch, args):
 
 def init_tensorboard_logger(run_name, fold, args):
     # Potential Bug: If resuming from a previous run, sometimes the graph has double values at the interrupted epoch
-    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], args['dataset'], args['model'], run_name, fold)
+    log_path = os.path.join(PATH['TENSORBOARD_LOGS'], args['dataset'], args['model'], run_name, f'fold_{fold}')
     os.makedirs(log_path, exist_ok=True)
     tensorboard_log = SummaryWriter(os.path.join(log_path))
     return tensorboard_log

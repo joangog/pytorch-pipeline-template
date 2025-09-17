@@ -145,6 +145,7 @@ def split_dataset(dataset, split_type='consecutive', train_val_folds=1, val_rati
 
 
 def get_dataloaders(train_set, val_set, test_set, batch_size, collate_fn):
+    # TODO: Perhaps we will need to create dataloaders with stratified sampling so that the batches are balanced
     if isinstance(train_set, list):  # If cross-validation, then each set is a list of Subset for each fold
         train_loader = [torch.utils.data.DataLoader(train_set[fold], batch_size=batch_size, shuffle=True,
                                                     collate_fn=collate_fn) for fold in range(len(train_set))]

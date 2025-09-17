@@ -1,4 +1,5 @@
 import os
+import torch
 from src.utils.model import save_checkpoint
 from src.utils.arg import save_config
 
@@ -8,7 +9,7 @@ class Trainer(object):
     A class for training the model.
     """
 
-    def __init__(self, criterion, validator, epochs, run_name, run_args, save_checkpoint_path):
+    def __init__(self, criterion, validator, epochs, run_name, run_args, save_checkpoint_path, device=None):
         """
         :param criterion: The loss criterion instance.
         :param validator: A Validator instance for validating during training
@@ -17,6 +18,7 @@ class Trainer(object):
         :param run_name: The name of the run.
         :param run_args: The arguments of the run script.
         :param save_checkpoint_path: The path to the directory of saved checkpoints for the specific model and dataset.
+        :param device: The device to use.
         """
         self.criterion = criterion
         self.validator = validator
@@ -24,21 +26,22 @@ class Trainer(object):
         self.run_name = run_name
         self.run_args = run_args
         self.save_checkpoint_path = save_checkpoint_path
+        self.device = torch.device(device) if device else torch.device('cpu')
 
         # Add loss criterion as a validation metric by default
         self.validator.metrics['loss'] = self.criterion
 
-    def train_step(self, model, optimizer, batch, scheduler=None, tqdm_progress_bar=None, tqdm_desc=None):
+    def train_step(self, model, optimizer, batch, tqdm_progress_bar=None, tqdm_desc=None):
         """
         Trains the model on one batch.
         :param model:  The model instance.
         :param optimizer: The optimizer instance.
         :param batch: A batch of images and labels.
-        :param scheduler: The scheduler instance.
         :param tqdm_desc: A description string for the tqdm progress bar.
         :return: The loss.
         """
         image, label = batch
+        image, label = image.to(self.device), label.to(self.device)
 
         optimizer.zero_grad()
 
@@ -49,8 +52,6 @@ class Trainer(object):
         loss = self.criterion(output, label)
         loss.backward()
         optimizer.step()
-        if scheduler:
-            scheduler.step()
 
         # Update progress bar
         if tqdm_progress_bar:
@@ -76,7 +77,7 @@ class Trainer(object):
         for batch_idx, batch in enumerate(train_loader):
             tqdm_desc = (f"Epoch {epoch} ({epoch + 1}/{self.epochs}): "
                          f"Training Batch {batch_idx} ({batch_idx + 1}/{len(train_loader)})")
-            loss += self.train_step(model, optimizer, batch, scheduler, tqdm_progress_bar, tqdm_desc)
+            loss += self.train_step(model, optimizer, batch, tqdm_progress_bar, tqdm_desc)
 
         # Average loss
         loss = loss / len(train_loader)
@@ -141,5 +142,9 @@ class Trainer(object):
                     tensorboard_log.add_scalars('loss', {'train': train_loss}, epoch)
                 for val_metric_name, val_metric_value in val_metrics.items():
                     tensorboard_log.add_scalar(f'{val_metric_name}/val', val_metric_value, epoch)
+
+            # Update scheduler
+            if scheduler:
+                scheduler.step()  # Note that the scheduler is stepped every epoch, not every batch
 
         return model, val_metrics
