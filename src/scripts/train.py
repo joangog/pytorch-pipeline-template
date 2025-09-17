@@ -48,11 +48,12 @@ parser.add_argument('--folds', '-f', type=int, nargs='?', help='Number of folds 
 parser.add_argument('--patience', type=int, nargs='?', help='Patience for early stopping')  # TODO Early stopping
 parser.add_argument('--device', type=str, nargs='?', choices=['cpu', 'gpu'],
                     help='Device type to use (cpu, gpu)')
-parser.add_argument('--gpus', type=int, nargs="*", help='GPU devices to use')
+parser.add_argument('--gpus', type=int, nargs="*", help='GPU devices to use')  # TODO: Multi-gpu not implemented yet
 parser.add_argument('--seed', '-s', type=int, nargs='?', help='Random seed')
 
 # Flag arguments
-parser.add_argument('--resume', '-r', action='store_true', default=False, help='Resume from checkpoint')
+parser.add_argument('--resume', '-r', action='store_true', default=False,
+                    help='Resume from checkpoint')  # TODO: not correctly implemented for multiple folds yet
 parser.add_argument('--save', '-S', action='store_true', default=True, help='Save checkpoint')
 parser.add_argument('--tensorboard', action='store_true', default=False, help='Enable tensorboard logging')
 parser.add_argument('--neptune', action='store_true', default=False, help='Enable neptune logging')
