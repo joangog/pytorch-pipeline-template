@@ -1,3 +1,4 @@
+import glob
 import numpy as np
 import torch
 from torch.utils.data.dataset import Subset
@@ -68,56 +69,88 @@ def split_dataset_in_two_sets(dataset, ratio, split_type, seed):
     return first_set, second_set
 
 
-def split_dataset(dataset, split_type='consecutive', train_val_folds=1, val_ratio=None, test_ratio=None, train_idx=None,
-                  val_idx=None, test_idx=None, seed=42):
+def read_dataset_split(dataset_split_path, train_val_folds):
+    """
+    Reads indices for dataset splitting from directory containing a TXT file for each subset and fold.
+    :param dataset_split_path: Path to directory containing the split files.
+    :param train_val_folds: Number of folds for cross-validation on the train+val set.
+    :return: Lists of indices for train, val (one for each fold) and test sets.
+    """
+    # Get file paths
+    train_idx_files = glob.glob(os.path.join(dataset_split_path, 'train_fold_*.txt'))
+    val_idx_files = glob.glob(os.path.join(dataset_split_path, 'val_fold_*.txt'))
+    test_idx_file = os.path.join(dataset_split_path, 'test.txt')
+    if len(train_idx_files) != 0 and len(val_idx_files) != 0:  # If train/val splits exist
+        assert len(train_idx_files) == len(
+            val_idx_files) == train_val_folds  # Check that there is one file per fold for train and val
+
+    # Read indices
+    train_idx, val_idx = [], []
+    for fold in range(train_val_folds):
+        with open(train_idx_files[fold], 'r') as f:
+            idx = [int(id) for id in f.readlines()[1:]]
+        train_idx.append(idx)
+        with open(val_idx_files[fold], 'r') as f:
+            idx = [int(id) for id in f.readlines()[1:]]
+        val_idx.append(idx)
+    with open(test_idx_file, 'r') as f:
+        idx = [int(id) for id in f.readlines()[1:]]
+    test_idx = idx
+
+    return train_idx, val_idx, test_idx
+
+
+def split_dataset(dataset, split_type='consecutive', val_ratio=None, test_ratio=None, train_val_folds=1,
+                  split_path=None, seed=42):
     """
     Splits the dataset into training and test sets.
     :param dataset: Dataset object to split.
-    :param val_ratio: Ratio of dataset to use for validaton test.
-    :param test_ratio: Ratio of dataset to use for test set.
     :param split_type: Type of splitting strategy to use.
                         If 'random', we use random samples for each split.
                         If 'stratify', we take use class-balanced splits.
                         If 'consecutive', we take consecutive samples for each split.
                         If 'idx', we take samples based on given ids.
-    :param seed: Random seed for splitting.
+    :param val_ratio: Ratio of dataset to use for validation set (to be used when split_type is not 'idx').
+    :param test_ratio: Ratio of dataset to use for test set (to be used when split_type is not 'idx' or '*_with_test_idx').
     :param train_val_folds: Number of folds for cross-validation on the train+val set. If 1, no cross-validation is performed.
-    :param train_idx: List or (Dictionary of Lists, when multiple folds) of indices for training set (to be used with split_type='ids').
-    :param val_idx: List or (Dictionary of Lists, when multiple folds) of indices for validation set (to be used with split_type='ids').
-    :param test_idx: List of indices for test set (to be used with split_type='ids').
+    :param split_path: Path to directory containing the split files (to be used with split_type='ids' or '*_with_test_idx').
+    :param seed: Random seed for splitting.
     :return: The Subset objects for the training and test sets.
     """
 
     # Initialize
-    train_set = []  # list of Subsets for every fold)
+    train_set = []  # list of Subsets for every fold
     val_set = []
-
-    train_val_set, test_set = split_dataset_in_two_sets(dataset, test_ratio, split_type, seed)
+    train_val_folds = 1 if train_val_folds is None else train_val_folds
 
     # If split from ids
     if split_type == 'idx':
-        if train_val_folds > 1:
-            for fold in range(train_val_folds):
-                if train_idx is None or val_idx is None or test_idx is None:
-                    raise ValueError('When using split_type="ids", train_ids, val_ids and test_ids must be provided.')
-                train_set.append(Subset(dataset, train_idx[fold]))
-                val_set.append(Subset(dataset, val_idx[fold]))
-            test_set = Subset(dataset, test_idx)
-    # If split only test from ids
-    elif '_with_test_idx' in split_type:
-        if test_idx is None:
-            raise ValueError('When using split_type="*_with_test_idx", test_ids must be provided.')
+        # Read indices from files
+        if split_path is None:
+            raise ValueError('When using split_type="ids", split_path must be provided.')
+        train_idx, val_idx, test_idx = read_dataset_split(split_path, train_val_folds)
+        for fold in range(train_val_folds):
+            train_set.append(Subset(dataset, train_idx[fold]))
+            val_set.append(Subset(dataset, val_idx[fold]))
         test_set = Subset(dataset, test_idx)
-        if train_val_folds > 1:
-            for fold in range(train_val_folds):
-                train_set[fold], val_set[fold] = split_dataset_in_two_sets(train_val_set, val_ratio / (1 - test_ratio),
-                                                                           split_type.replace('_with_test_idx', ''),
-                                                                           seed)
-        else:
-            train_set, val_set = split_dataset_in_two_sets(train_val_set, val_ratio / (1 - test_ratio),
-                                                           split_type.replace('_with_test_idx', ''), seed)
-    # If not split from ids, then split using the given strategy
+
+    # If not split all from ids,
     else:
+
+        # If split only test from ids
+        if '_with_test_idx' in split_type:
+            # Read test indices from file
+            if split_path is None:
+                raise ValueError('When using split_type="*_with_test_idx", split_path must be provided.')
+            _, _, test_idx = read_dataset_split(split_path, train_val_folds)
+            test_set = Subset(dataset, test_idx)
+            train_val_set = Subset(dataset, list(set(range(len(dataset))) - set(test_idx)))
+
+        # If not split from ids, then split test using specified method
+        else:
+            train_val_set, test_set = split_dataset_in_two_sets(dataset, test_ratio, split_type, seed)
+
+        # Split train/val using specified method
         if train_val_folds > 1:
             fold_sets = []
             remaining_set = train_val_set
@@ -132,7 +165,8 @@ def split_dataset(dataset, split_type='consecutive', train_val_folds=1, val_rati
                 train_set.append(ConcatDataset([fold_sets[fold2] for fold2 in range(train_val_folds) if fold2 != fold]))
                 val_set.append(fold_sets[fold])
         else:
-            train_set, val_set = split_dataset_in_two_sets(train_val_set, val_ratio / (1 - test_ratio), split_type,
+            train_set, val_set = split_dataset_in_two_sets(train_val_set, val_ratio / (1 - test_ratio),
+                                                           split_type.replace('_with_test_idx', ''),
                                                            seed)
 
     # Assert whole dataset is used

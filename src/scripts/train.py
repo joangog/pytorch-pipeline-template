@@ -31,10 +31,10 @@ parser.add_argument('--dataset', '-ds', type=str, nargs='?', choices=['CIFAR10']
 parser.add_argument('--data_path', '-d', type=str, nargs='?', help='Path to data folder')
 parser.add_argument('--dataset_split_type', '-dst', type=str, nargs='?',
                     help='Method to split the dataset into train/val/test sets')
-# parser.add_argument('--dataset_split_path', '-dsp', type=str, nargs='?', help='Path to file with dataset split indices')
+parser.add_argument('--dataset_split_path', '-dsp', type=str, nargs='?', help='Path to file with dataset split indices')
 parser.add_argument('--outputs_path', '-o', type=str, nargs='?', help='Path to outputs folder')
 parser.add_argument('--model', '-m', type=str, nargs='?', choices=['CIFARModel'], help='Model name')
-parser.add_argument('--checkpoint_path', '-w', type=str, nargs='?', help='Path to model checkpoint')
+parser.add_argument('--checkpoint_path', '-ckpt', type=str, nargs='?', help='Path to model checkpoint')
 parser.add_argument('--batch', '-b', type=int, nargs='?', help='Batch size')
 parser.add_argument('--loss', type=str, nargs='?', choices=['MSE', 'MAE', 'BCE', 'CE'], help='Loss function')
 parser.add_argument('--epochs', '-e', type=int, nargs='?', help='Number of epochs')

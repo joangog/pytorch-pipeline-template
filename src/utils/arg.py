@@ -13,7 +13,7 @@ def validate_args(args, parser):
     """
 
     # Args that can be None
-    none_args = ['checkpoint_path', 'gpus', 'data_path', 'outputs_path', 'scheduler', 'folds']
+    none_args = ['checkpoint_path', 'gpus', 'data_path', 'dataset_split_path', 'outputs_path', 'scheduler', 'folds']
 
     # Override values from the config file under conditions
     if not args['data_path']:
